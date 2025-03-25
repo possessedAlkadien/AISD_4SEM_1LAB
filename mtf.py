@@ -1,25 +1,22 @@
-def bMTF(S):
-    T = [chr(i) for i in range(128)]
-    L = []
+import os
+
+def MTF(S):
+    T = [chr(i) for i in range(512)]
     s_new = bytearray()
     for s in S:
         i = T.index(chr(s))
-        L.append(i)
         s_new.append(i)
-        T = [T[i]] + T[:i] + T[i+1:]
+
+        T.insert(0, T.pop(i))
     return bytes(s_new)
 
-def ibMTF(S):
-    T = [chr(i) for i in range(128)]
+def iMTF(S):
+    T = [chr(i) for i in range(512)]
     S_new = bytearray()
     for s in S:
-        char = chr(s)
-        i = T.index(char)
-        S_new.append(s)
+        # Получаем индекс символа
+        i = s
+        S_new.append(ord(T[i]))
         T.insert(0, T.pop(i))
     return bytes(S_new)
 
-s = b'aaaaaaabbbbbbbcccccccccccdefrt'
-print(s)
-print(repr(bMTF(s)))
-print(ibMTF(s))

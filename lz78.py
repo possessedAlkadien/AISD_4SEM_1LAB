@@ -1,49 +1,58 @@
+import struct
+
+
 def LZ78(data):
-    # Инициализируем словарь кодов
-    dict_of_codes = {data[0:1]: b'1'}  # Используем байты
-    encoded_result = bytearray()  # Используем bytearray для хранения результата
-    encoded_result.extend(b'0' + data[0:1])  # Записываем первый байт с индексом 0
-    data = data[1:]  # Убираем первый байт из данных
-    combination = bytearray()  # Используем bytearray для комбинации
-    code = 2  # Начинаем с кода 2
+    dictionary = {b'': 0}
+    current = b''
+    encoded = []
+    code = 1  # Следующий доступный код
 
     for byte in data:
-        combination.append(byte)  # Добавляем байт к комбинации
-        if bytes(combination) not in dict_of_codes:
-            dict_of_codes[bytes(combination)] = str(code).encode()  # Кодируем в байты
-            if len(combination) == 1:
-                encoded_result.extend(b'0' + bytes(combination))  # Записываем (0, байт)
-            else:
-                # Записываем (код предыдущей комбинации, последний байт)
-                encoded_result.extend(dict_of_codes[bytes(combination[:-1])] + bytes([combination[-1]]))
-            code += 1  # Увеличиваем код
-            combination.clear()  # Очищаем комбинацию
-
-    return bytes(encoded_result)
-
-
-def iLZ78(coded_data):
-    # Инициализируем словарь кодов
-    dict_of_codes = {b'0': b'', b'1': coded_data[1:2]}  # Используем байты
-    decoded_result = bytearray()  # Используем bytearray для хранения результата
-    decoded_result.extend(dict_of_codes[b'1'])  # Записываем первый байт
-    coded_data = coded_data[2:]  # Убираем первые два байта из данных
-    combination = bytearray()  # Используем bytearray для комбинации
-    code = 2  # Начинаем с кода 2
-
-    for byte in coded_data:
-        if byte in b'0123456789':  # Проверяем, является ли байт цифрой
-            combination.append(byte)  # Добавляем байт к комбинации
+        current_candidate = current + bytes([byte])
+        if current_candidate in dictionary:
+            current = current_candidate
         else:
-            # Декодируем комбинацию и добавляем новый байт
-            dict_of_codes[str(code).encode()] = dict_of_codes[bytes(combination)] + bytes([byte])
-            decoded_result.extend(dict_of_codes[bytes(combination)] + bytes([byte]))
-            combination.clear()  # Очищаем комбинацию
-            code += 1  # Увеличиваем код
+            # Добавляем (код предыдущей строки, новый байт)
+            encoded.append((dictionary[current], bytes([byte])))
+            dictionary[current_candidate] = code
+            code += 1
+            current = b''
 
-    return bytes(decoded_result)
+    # Сериализация в бинарный формат с использованием 4 байт для кода
+    result = bytearray()
+    for code_num, char in encoded:
+        result += struct.pack('>I', code_num)  # 4 байта для кода
+        result += char  # Символ всегда присутствует
 
-string = b"aaaabbbbabababababa$"
-compressed_data = LZ78(string)
-print("Compressed data:", compressed_data)
-print(iLZ78(LZ78(string)))
+    return bytes(result)
+
+
+def iLZ78(compressed_data):
+    dictionary = {0: b''}
+    decoded = bytearray()
+    code = 1
+
+    # Чтение данных по 5 байт (4 байта код + 1 байт символ)
+    for i in range(0, len(compressed_data), 5):
+        chunk = compressed_data[i:i + 5]
+        if len(chunk) < 5:
+            break
+
+        # Распаковка кода и символа
+        current_code = struct.unpack('>I', chunk[:4])[0]
+        current_char = chunk[4:5]
+
+        # Получение фразы из словаря
+        if current_code not in dictionary:
+            raise ValueError(f"Invalid code {current_code}")
+
+        phrase = dictionary[current_code] + current_char
+        decoded += phrase
+
+        # Добавление новой фразы в словарь
+        dictionary[code] = phrase
+        code += 1
+
+    return bytes(decoded)
+
+
